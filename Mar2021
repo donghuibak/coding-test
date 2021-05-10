@@ -1,0 +1,119 @@
+# 2021년 3월 코딩테스트 응답으로 데이터 관련 정보와 질문 응답은 마스킹 처리
+
+# 기본 라이브러리 세팅
+library(ggplot2)
+library(dplyr)
+library(RMySQL)
+
+### Q1. ******
+## 1. DB 접속
+TaskDB <- dbConnect(
+  MySQL(),
+  user = '****',
+  password = '****',
+  host = '****',
+  dbname = '****',
+)
+dbSendQuery(TaskDB, 'set character set "utf8"')
+
+## 2. 데이터 추출
+Q1 <- dbGetQuery(
+  TaskDB,
+  "SELECT SUBSTR(SUBSTRING_INDEX(json_extract(result, '$.id'), '-', 1), 2) AS type
+          ,json_extract(result, '$.question_list[6].answer') AS grd
+     FROM ****
+    WHERE taskrun_id IN (SELECT T1.id
+                           FROM core_taskrun T1
+                          INNER JOIN (SELECT user_id
+                                       FROM ****
+                                      WHERE gender = 'F'
+                                        AND age_range = 30 
+                                      ORDER BY user_id) T2 
+                             ON T1.owner_id = T2.user_id)      /* fk로 확인 */
+                            AND (json_extract(result, '$.id') = '****' /* 해당 질문지 */
+                                 OR json_extract(result, '$.id') = '****')"
+);
+
+## 3. 추출 데이터 확인
+str(Q1)
+# grd 데이터 타입을 숫자로 변경
+Q1$grd <- as.numeric(Q1$grd)
+# 확인
+str(Q1)
+
+## 4. 시각화
+# 평가 점수와 평균을 시각화
+A1 <- ggplot(Q1, aes(grd, fill = type)) + geom_bar() + scale_x_continuous(breaks = 1:10) + 
+  geom_hline(yintercept=mean(Q1$grd), linetype='dashed', color = 'red') + 
+  geom_text(aes(0,round(mean(grd), digit=2),label = round(mean(grd), digit=2), vjust = -1))
+A1
+# 순서형 데이터를 시각화하기 위해 막대그래프 사용
+
+### A1. ****
+
+### Q2. ***
+## 1. 데이터 추출
+Q2 <- dbGetQuery(
+  TaskDB,
+  "SELECT HOUR(created_at) AS time
+          ,count(*) AS cnt
+    FROM **** T1
+   INNER JOIN (SELECT user_id
+                 FROM ****
+                WHERE age_range >= 50
+                ORDER BY user_id) T2 
+      ON T1.owner_id = T2.user_id
+   GROUP BY HOUR(created_at)
+   ORDER BY time"
+);
+
+## 2. 추출 데이터 확인
+str(Q2)
+
+## 3. 시각화
+percent1 <- round(Q2$cnt/sum(Q2$cnt)*100)
+time1 <- paste(Q2$time, percent1)
+percent1 <- paste(time1, "%", sep="")
+pie(Q2$cnt, labels = percent1, col=rainbow(length(percent1)), clockwise = T, cex = 0.7)
+
+### A2. ****
+
+### Q3. ****
+## 1. 데이터 추출
+Q3 <- dbGetQuery(
+  TaskDB,
+  "SELECT json_unquote(json_extract(result, '$.question_list[4].answer')) AS ans  
+   FROM ****
+  WHERE json_extract(result, '$.id') = '****'  
+     OR json_extract(result, '$.id') = '****'"
+);
+# MySQL 내에서 jason_extract만으로 추출시 한글이 제대로 표기가 되지 않아 json_unquote를 추가  
+
+## 2. 추출 데이터 확인
+str(Q3)
+# 위처럼 R에서는 한글이 제대로 표기되지 않음. utf-8 별도 인코딩 진행
+dbSendQuery(TaskDB, "SET NAMES utf8;")
+dbSendQuery(TaskDB, "SET character_set_connection=utf8;")
+get <-dbGetQuery(TaskDB, "SELECT json_unquote(json_extract(result, '$.question_list[4].answer')) AS ans
+ FROM ****
+ WHERE json_extract(result, '$.id') = '****'
+ OR json_extract(result, '$.id') = '****'"
+);
+Encoding(get[,1]) <- 'UTF-8'
+str(get)
+
+# 4. NLP를 위한 패키지 설치
+
+<!--
+  install.packages("rJava")
+library(rJava)
+install.packages("multilinguer")
+library(multilinguer)
+install_jdk()
+install.packages(c("hash", "tau", "Sejong", "RSQLite", "devtools", "bit", "rex", "lazyeval", "htmlwidgets", "crosstalk", "promises", "later", "sessioninfo", "xopen", "bit64", "blob", "DBI", "memoise", "plogr", "covr", "DT", "rcmdcheck", "rversions"), type = "binary")
+install.packages("remotes")
+remotes::install_github('haven-jeon/KoNLP', upgrade = "never", INSTALL_opts=c("--no-multiarch"))
+-->
+# 진행 중 오류로 NLP 패키지 설치 불가. 분석 진행 불가.  
+
+### 끝
